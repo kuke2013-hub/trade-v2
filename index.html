@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#020704"/>
+  <meta name="description" content="Binance Breakout Laboratory — experimental crypto momentum signals and read-only paper trading."/>
+  <title>Breakout Lab V2 — Historical ML Research Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="./styles.css"/>
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="#top" aria-label="Breakout Laboratory home"><span class="logo">↗</span><span><strong>BREAKOUT<span class="accent">LAB V2</span></strong><small>HISTORICAL INTELLIGENCE / 02</small></span></a>
+    <div class="side-label">WORKSPACE</div>
+    <nav aria-label="Main navigation">
+      <a href="#overview" class="nav-link active"><span>▦</span> Overview</a>
+      <a href="#candidates" class="nav-link"><span>⌁</span> Pair explorer</a>
+      <a href="#paper" class="nav-link"><span>◈</span> Paper trading</a>
+      <a href="#method" class="nav-link"><span>≡</span> Methodology</a>
+    </nav>
+    <div class="side-bottom"><span class="mini-dot"></span> PUBLIC SPOT MARKET DATA<br><span class="muted">No account keys · No real orders</span></div>
+  </aside>
+  <main id="top">
+    <header class="topbar">
+      <div class="breadcrumb">RESEARCH / BINANCE / <span>USDT SPOT</span></div>
+      <div class="top-meta"><span id="header-paper-pnl" class="header-paper-pnl" aria-label="Total estimated simulated paper trading profit or loss">PAPER NET $0.00</span><span id="clock">—</span><span class="connection" id="connection"><span class="status-dot"></span>CONNECTING</span></div>
+    </header>
+    <div class="content">
+      <section id="overview" class="hero">
+        <div class="eyebrow"><span class="tiny-square"></span> EXPERIMENT 002 / HISTORICAL MACHINE LEARNING</div>
+        <div class="hero-line"><div><h1>Learn the pattern.<br><em>Then</em> test the trade.</h1><p>A historical-data research system built alongside four rule-based benchmarks. The fifth model is trained only from checksum-verified Binance market archives and can paper-trade only after passing untouched holdout tests. No fabricated AI predictions.</p></div><div class="hero-action"><button id="refresh" class="primary">↻ &nbsp; Run market scan</button><div id="scan-status" class="scan-status" role="status">Preparing market scanner…</div></div></div>
+      </section>
+      <section class="metric-grid" aria-label="Scanner metrics">
+        <div class="metric"><div class="metric-label">ELIGIBLE PAIRS</div><div id="metric-pairs" class="metric-value">—</div><div class="metric-hint">Spot · USDT · liquidity filter</div></div>
+        <div class="metric"><div class="metric-label">ANALYSED PAIRS</div><div id="metric-scanned" class="metric-value">—</div><div class="metric-hint">Closed 1h candles only</div></div>
+        <div class="metric"><div class="metric-label">NEAR RESISTANCE</div><div id="metric-near" class="metric-value highlight">—</div><div class="metric-hint">Potential setups, no entry yet</div></div>
+        <div class="metric"><div class="metric-label">LIVE SIGNALS</div><div id="metric-signals" class="metric-value highlight">—</div><div class="metric-hint">At least one strategy triggered</div></div>
+        <div class="metric"><div class="metric-label">DATA FRESHNESS</div><div id="metric-time" class="metric-value time-value">—</div><div class="metric-hint">Latest successful retrieval UTC</div></div>
+      </section>
+      <div id="error-banner" class="error-banner" hidden></div>
+      <section class="model-panel" id="historical-ml" aria-label="Historical machine learning model and validation">
+        <div class="section-header"><div><div class="eyebrow">01 / HISTORICAL INTELLIGENCE ENGINE</div><h2>Binance Vision research model <span id="ml-status" class="ml-status" data-state="untrained">UNTRAINED</span></h2><p id="ml-coverage">NO HISTORICAL TRAINING OBSERVATIONS LOADED</p></div><span class="data-tag">2017 → 2026 · AS AVAILABLE</span></div>
+        <div class="ml-metrics"><div><span>TRAINED ALGORITHM</span><strong id="ml-model">—</strong></div><div><span>UNTOUCHED TEST BRIER / BASELINE</span><strong id="ml-brier">—</strong></div><div><span>ENTRY CONFIDENCE THRESHOLD</span><strong id="ml-threshold">—</strong></div><div><span>OUT-OF-SAMPLE OBSERVATIONS</span><strong id="ml-samples">—</strong></div></div>
+        <p id="ml-training-note" class="ml-training-note">The model remains inactive until historical training and validation have succeeded.</p>
+        <p class="ml-disclaimer">Independent model research · Historical returns are not forecasts · No real orders · <a href="https://github.com/kuke2013-hub/trade-v2/actions">View training workflow</a> · <a href="https://github.com/kuke2013-hub/trade-v2/blob/main/models/report.json">Training provenance and holdout report</a></p>
+      </section>
+      <section class="signal-panel" id="prebreakout">
+        <div class="section-header"><div><div class="eyebrow">02 / BREAKOUT RADAR</div><h2>Potential and confirmed breakouts <span class="count" id="near-count">0</span></h2><p>Confirmed hourly breakouts are pinned first. Near-breakout candidates follow behind them. Approaching candidates have a red outline. Confirmed entry signals have a double red border and a stronger subtle pulse.</p></div><span class="data-tag">1H CLOSED CANDLES</span></div>
+        <div id="approaching" class="signal-list"><div class="empty">Waiting for the hourly resistance scanner…</div></div>
+      </section>
+      <section class="signal-panel" hidden>
+        <div class="section-header"><div><div class="eyebrow">03 / CONFIRMED ENTRIES</div><h2>Confirmed breakouts</h2><p>Signals are rule triggers, not probabilities. No historical profitability has been established.</p></div><span class="data-tag">1H CLOSED BARS</span></div>
+        <div id="signals" class="signal-list"><div class="empty">Waiting for authentic Binance market data. No signals will be fabricated.</div></div>
+      </section>
+      <section id="candidates" class="pairs-panel">
+        <div class="section-header"><div><div class="eyebrow">04 / MARKET UNIVERSE</div><h2>USDT pair explorer <span class="count" id="pair-count">0</span></h2><p>Ranked every minute using the latest market price near hourly resistance, then confirmed hourly signals. Charts load on scroll; indicator meters show proximity, RSI and volume. Paper-trade entries still use completed 1-hour breakout signals.</p></div><div class="controls"><input id="filter" type="search" placeholder="Search e.g. SOL" aria-label="Filter symbols"/><select id="sort" aria-label="Sort pairs"><option value="score">Pre-breakout readiness first</option><option value="distance">Closest below resistance</option><option value="ml">Historical ML estimate (if trained)</option><option value="gain">24h % change</option><option value="volume">24h quote volume</option><option value="alphabetical">Symbol A–Z</option></select></div></div>
+        <div class="chart-toolbar"><div class="chart-toolbar-label">CANDLE INTERVAL <span class="chart-interval-note">(M = month · m = minute)</span></div><div id="chart-timeframes" class="timeframe-controls" role="group" aria-label="Candle interval for pair charts"><button type="button" class="timeframe-btn" data-interval="1M" title="1-month candles">1M</button><button type="button" class="timeframe-btn" data-interval="1w" title="1-week candles">1W</button><button type="button" class="timeframe-btn" data-interval="1d" title="1-day candles">1D</button><button type="button" class="timeframe-btn active" data-interval="1h" title="1-hour candles" aria-pressed="true">1H</button><button type="button" class="timeframe-btn" data-interval="5m" title="5-minute candles">5m</button><button type="button" class="timeframe-btn" data-interval="3m" title="3-minute candles">3m</button><button type="button" class="timeframe-btn" data-interval="1m" title="1-minute candles">1m</button></div></div><div class="chart-refresh-line"><span id="chart-refresh-state" role="status">Preparing chart updates…</span><button id="refresh-charts" class="refresh-chart-button" type="button">↻ Refresh visible charts</button></div><div class="legend"><span><i class="legend-up"></i> Up candle</span><span><i class="legend-down"></i> Down candle</span><span class="muted">Charts may include the candle still forming · Scores always use closed 1H candles and are NOT win probabilities</span></div>
+        <div class="card-grid" id="cards"><div class="empty">Retrieving tradable Binance pairs…</div></div>
+      </section>
+      <section id="paper" class="paper-panel">
+        <div class="section-header"><div><div class="eyebrow">05 / FORWARD EXPERIMENT</div><h2>Paper trading laboratory</h2><p>Five separate virtual portfolios, including the historical model only if it passes its holdout gates. Stored only in this browser, not in your GitHub account.</p></div><div class="paper-actions"><button id="export" class="secondary">↓ Export CSV</button><button id="paper-toggle" class="primary small">Start paper engine</button></div></div>
+        <div class="notice" id="paper-notice">PAUSED · No trades will be opened until you start the simulator. It only operates while this page is open. No real money is ever used.</div>
+        <div class="paper-summary" aria-label="Combined performance across four simulated strategy portfolios">
+          <div class="paper-summary-main"><div class="paper-summary-label">TOTAL PAPER NET P&amp;L · ALL STRATEGIES</div><div class="paper-summary-value" id="paper-total-net">$0.00</div><div class="paper-summary-sub">Realised + estimated open P&amp;L; simulated, not real money</div></div>
+          <div class="paper-summary-stat"><div class="paper-summary-label">REALISED NET PROFIT</div><div class="paper-summary-number" id="paper-total-realised">$0.00</div><div class="paper-summary-sub">Closed trades across all portfolios</div></div>
+          <div class="paper-summary-stat"><div class="paper-summary-label">OPEN-POSITION P&amp;L</div><div class="paper-summary-number" id="paper-total-open">$0.00</div><div class="paper-summary-sub">Estimated value after exit costs</div></div>
+          <p id="paper-summary-caption" class="paper-summary-caption">Five separate virtual portfolios; market prices required for open-position estimates.</p>
+        </div>
+        <div class="portfolio-grid" id="portfolios"></div>
+        <div class="subheader"><h3>Trade ledger <span class="ledger-note-title">· GROUPED BY SIGNAL</span></h3><button id="reset" class="text-button">Reset virtual accounts</button></div><p class="ledger-disclosure">One row per market signal. Multiple strategy accounts may open separate virtual positions at the same time. Net P&amp;L is the combined result across those accounts, not one position; select a row to inspect individual model trades. CSV export retains every underlying position.</p>
+        <div class="table-scroll"><table><thead><tr><th>TIME (UTC)</th><th>STRATEGIES</th><th>PAIR</th><th>ENTRY</th><th>EXIT</th><th>NET P&amp;L (MODELS)</th><th>STATUS / EXIT</th></tr></thead><tbody id="ledger"><tr><td colspan="7">No simulated positions recorded.</td></tr></tbody></table></div>
+      </section>
+      <section id="method" class="method-panel"><div class="section-header"><div><div class="eyebrow">06 / TRANSPARENCY</div><h2>What the algorithms actually do</h2><p>Four fixed-rule baselines plus one data-trained historical model. The ML model never trades unless the holdout paper gate is passed.</p></div></div><div id="methods" class="methods"></div>
+        <div class="limitations"><h3>Important limitations</h3><p>This is a browser-run experiment. Trades are simulated from available Binance spot data, not an exchange paper account. Candlestick extrema do not reveal intraminute execution order, and simulated spread/slippage may differ materially from real fills. Missing data pauses decisions; the application never invents candles or results. The +2% target and −1.5% stop are experimental parameters; historic model labels use next-hour open and conservative 1h candles, not exact executions. No live execution, leverage, futures or shorts are supported.</p><p>Live market rankings refresh approximately every 60 seconds, and one-, three- and five-minute charts refresh every 60 seconds for visible pairs while this tab is open; background throttling and API limits may delay updates. The price/ranking scan runs every minute, but confirmed strategy signals only change when a new hourly candle closes. Automatic scanning is attempted periodically while this tab is open; background-tab throttling, disconnected internet, CORS limits, geographic restrictions and browser shutdown can interrupt monitoring. A persistent 24/7 service and independent out-of-sample backtests are required before considering a strategy validated.</p></div>
+      </section>
+      <footer>BREAKOUT LAB V2 · HISTORICAL RESEARCH ONLY <span>Sources: Binance public market-data API · Built for GitHub Pages</span></footer>
+    </div>
+  </main>
+</div>
+<div class="modal" id="detail" hidden><div class="modal-backdrop" data-close="1"></div><section class="modal-panel" role="dialog" aria-modal="true" aria-label="Pair analysis"><div class="modal-head"><div><div class="eyebrow" id="detail-timeframe-label">PAIR DETAIL / 1H CHART</div><h2 id="detail-symbol">—</h2></div><button id="close-detail" class="close" aria-label="Close">×</button></div><div class="detail-chart-toolbar"><span>CHART INTERVAL</span><div id="detail-timeframes" class="timeframe-controls" role="group" aria-label="Candle interval for detailed chart"><button type="button" class="timeframe-btn" data-interval="1M" title="1-month candles">1M</button><button type="button" class="timeframe-btn" data-interval="1w" title="1-week candles">1W</button><button type="button" class="timeframe-btn" data-interval="1d" title="1-day candles">1D</button><button type="button" class="timeframe-btn active" data-interval="1h" title="1-hour candles" aria-pressed="true">1H</button><button type="button" class="timeframe-btn" data-interval="5m" title="5-minute candles">5m</button><button type="button" class="timeframe-btn" data-interval="3m" title="3-minute candles">3m</button><button type="button" class="timeframe-btn" data-interval="1m" title="1-minute candles">1m</button></div></div><div class="modal-data" id="detail-stats"></div>
+<div class="trade-overlay-panel" id="detail-paper"><div class="trade-overlay-head"><strong>PAPER TRADE MARKERS</strong><select id="detail-trade-select" aria-label="Recorded paper trade" hidden></select></div><div class="trade-window-buttons" id="detail-trade-windows" hidden><button type="button" data-window="entry" class="active">Entry minute window</button><button type="button" data-window="exit" id="trade-window-exit">Sell minute window</button><button type="button" data-window="latest">Latest minute candles</button></div><div id="detail-trade-summary" class="trade-summary" hidden></div><p id="detail-paper-hint">No paper trade has been recorded for this pair.</p></div>
+<canvas id="detail-chart" width="1100" height="420" aria-label="Selected interval candlestick chart with recorded simulated entry, stop, target and exit levels"></canvas><div id="detail-chart-note" class="chart-timestamp-note" role="status"></div><div class="overlay-legend"><i class="ema9-key"></i> EMA 9 <i class="ema21-key"></i> EMA 21</div><div id="detail-indicators" class="detail-indicators" aria-label="Technical indicators for selected chart interval"></div><div id="detail-explanation" class="explanation"></div></section></div>
+</body>
+</html>

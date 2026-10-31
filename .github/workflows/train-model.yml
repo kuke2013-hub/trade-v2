@@ -1,0 +1,53 @@
+name: Train historical Binance ML model (noncommercial research)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'research/**'
+      - 'config/universe.txt'
+      - '.github/workflows/train-model.yml'
+permissions:
+  contents: write
+concurrency:
+  group: binance-historical-training
+  cancel-in-progress: false
+jobs:
+  historical-training:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install offline modelling libraries
+        run: python -m pip install --disable-pip-version-check -r research/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: binance-vision-hourly-${{ hashFiles('config/universe.txt', 'research/pipeline.py') }}-${{ github.run_id }}
+          restore-keys: |
+            binance-vision-hourly-${{ hashFiles('config/universe.txt', 'research/pipeline.py') }}-
+      - name: Retrieve authenticated historical archives, train and hold out future samples
+        run: python research/pipeline.py --symbols config/universe.txt --start 2017-08 --workers 12 --output models/latest.json --report models/report.json
+      - name: Attach historical research report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-historical-ml-research
+          path: |
+            models/latest.json
+            models/report.json
+          if-no-files-found: ignore
+      - name: Publish authentic model with research-only validation disclosure
+        run: |
+          test -s models/latest.json
+          test -s models/report.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add models/latest.json models/report.json
+          git commit -m "Publish research-only Binance Vision model and honest holdout metrics" || exit 0
+          git push origin HEAD:main

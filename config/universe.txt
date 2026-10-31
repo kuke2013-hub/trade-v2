@@ -1,0 +1,21 @@
+# Binance Vision spot historical research cohort; expand with delisted pairs to reduce survivorship bias.
+BTCUSDT
+ETHUSDT
+BNBUSDT
+XRPUSDT
+ADAUSDT
+LTCUSDT
+DOGEUSDT
+TRXUSDT
+LINKUSDT
+SOLUSDT
+AVAXUSDT
+NEARUSDT
+DOTUSDT
+ATOMUSDT
+UNIUSDT
+FILUSDT
+ETCUSDT
+ALGOUSDT
+FTTUSDT
+LUNAUSDT
