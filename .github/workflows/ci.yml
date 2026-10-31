@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/engine.test.mjs tests/trade-chart.test.mjs tests/ml.test.mjs
+      - run: node --test tests/engine.test.mjs tests/trade-chart.test.mjs tests/ml.test.mjs tests/cloud.test.mjs
       - run: npm install --no-save playwright
       - run: npx playwright install --with-deps chromium
       - name: Validate the browser and actual user interactions

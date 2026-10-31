@@ -367,3 +367,11 @@ body{background:#090909;color:var(--text)}
 .ml-estimate-muted{color:#929292;border-color:#383838}
 .signal-tile .ml-estimate,.signal-tile .ml-estimate-muted{margin-top:8px}
 @media(max-width:750px){.ml-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.model-panel{padding:16px}.ml-status{display:table;margin:8px 0 0}}
+
+/* Cloudflare read-only D1 research monitor: visually distinct from browser-local portfolios. */
+.cloud-panel{margin-top:28px}.cloud-control{display:flex;align-items:center;flex-wrap:wrap;gap:11px;margin:14px 0 11px}.cloud-control label{font-size:12px;letter-spacing:.09em;color:var(--sub)}
+.cloud-control input{min-width:260px;flex:1;max-width:580px;padding:10px 12px;font-size:13px;background:#121212;color:var(--text);border:1px solid var(--line);border-radius:5px;font-family:inherit}.cloud-control input:focus{outline:1px solid #929292}
+.cloud-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0 23px}
+.cloud-metrics>div{background:#181818;border:1px solid #363636;border-radius:5px;padding:14px;display:flex;flex-direction:column;gap:7px}
+.cloud-metrics small{color:var(--sub);font-size:11px;letter-spacing:.05em}.cloud-metrics strong{font-size:18px;color:#d4d4d4;overflow-wrap:anywhere}
+@media(max-width:930px){.cloud-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:570px){.cloud-metrics{grid-template-columns:1fr 1fr}.cloud-metrics strong{font-size:15px}}

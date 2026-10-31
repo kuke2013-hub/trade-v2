@@ -84,3 +84,16 @@ GitHub Actions `.github/workflows/ci.yml` independently tests the historical Pyt
 - `.github/workflows/` — CI, Pages, historical training
 
 The data source is Binance Vision, supplied free for noncommercial research subject to its published terms. Independent research does not imply Binance endorsement.
+
+
+## 2026-10-31: actual historical model recovered from completed GitHub training
+
+The first historical training completed against **1,779 checksum-verified monthly Binance archives**, with **20 symbols** and **717,842 labelled candidate observations** (dataset through 2026-09-29). Its trained model `models/latest.json` is a gradient-boosting classifier; the complete research report is `models/report.json`.
+
+**Crucial: the untouched holdout did NOT accept this model for paper trading.** Holdout Brier = **0.2057346982** versus constant baseline **0.2107306276**, holdout AUC ≈ **0.5947**, but the calibration-selected trading threshold (0.75) yielded **zero selected trades** in calibration and holdout. Therefore there is **no demonstrated positive net trading edge** and the ML portfolio remains **disabled**, even though historical prediction estimates can be displayed with their research caveats.
+
+The original training GitHub Action failed *after* training because a concurrent code commit made its `git push` non-fast-forward. Model and report were recovered from the exact GitHub Actions workflow artifact, without re-training, and the workflow was adjusted to rebase before publication on future runs. This is a restored research record, not a newly inferred or fabricated score.
+
+## Cloudflare optional independent 24/7 paper pilot
+
+V2 includes a standalone [Cloudflare Worker implementation](cloud/README.md) for paper-trading a small rotating cohort without leaving the browser open. It uses a Cloudflare D1 database and scheduled Cron Triggers. It is **not active solely by connecting GitHub to a Cloudflare account**: the user must create a D1 database, enter its database ID in `cloud/wrangler.jsonc`, and deploy the Worker through Cloudflare Workers Builds. The existing GitHub Pages website remains independently available, and its browser-local portfolio ledger remains separate from cloud paper trades.

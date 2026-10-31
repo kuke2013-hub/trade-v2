@@ -369,7 +369,42 @@ async function scan(){if(busy)return;busy=true;clearError();$('refresh').disable
   }catch(e){status('Scan failed · no invented data');showError(e.message);}finally{busy=false;$('refresh').disabled=false;}
 }
 function downloadCSV(){const all=STRATEGIES.flatMap(s=>paper.portfolios[s.id].trades);const header=['strategy','symbol','entry_time_utc','exit_time_utc','entry_fill','exit_fill','cost_usdt','proceeds_usdt','entry_fee_usdt','exit_fee_usdt','net_pnl_usdt','return_pct','reason'];const lines=all.map(t=>[t.strategyId,t.symbol,new Date(t.entryTime).toISOString(),new Date(t.exitTime).toISOString(),t.entryPrice,t.exitPrice,t.cost,t.proceeds,t.entryFee,t.exitFee,t.pnl,t.returnPct,t.reason].join(','));const b=new Blob([[header.join(','),...lines].join('\n')],{type:'text/csv'});const url=URL.createObjectURL(b);const a=document.createElement('a');a.href=url;a.download='breakout-lab-paper-trades.csv';a.click();URL.revokeObjectURL(url);}
+
+// Cloudflare monitor is READ-ONLY and independently funded/accounted. Nothing here can
+// arm cloud trading, reset D1 positions or merge them with local browser portfolios.
+let cloudWorkerUrl='';
+function cloudStatus(text,status='disconnected'){
+  $('cloud-run-state').textContent=status==='connected'?'CONNECTED · PAPER ONLY':status==='stale'?'STALE · CHECK LOGS':'NOT CONNECTED';
+  $('cloud-message').textContent=text;
+}
+function utcBrief(ms){return Number.isFinite(ms)?new Date(ms).toISOString().replace('T',' ').slice(0,16)+' UTC':'—';}
+function cloudNumeric(v){return typeof v==='number'&&Number.isFinite(v)?cash(v):'—';}
+async function refreshCloud(){
+  if(!cloudWorkerUrl){cloudStatus('Enter your deployed Cloudflare Worker URL to read its persistent virtual trading results.');return;}
+  try{
+    const url=new URL(cloudWorkerUrl);
+    if(url.protocol!=='https:')throw new Error('Only HTTPS Worker URLs are supported.');
+    const res=await fetch(`${url.origin}${url.pathname.replace(/\/$/,'')}/api/status`,{cache:'no-store',signal:AbortSignal.timeout(15000)});
+    if(!res.ok)throw new Error(`Cloud monitor HTTP ${res.status}`);
+    const data=await res.json();
+    if(data.paperOnly!==true||data.liveOrders!==false||!data.performance||!data.meta)throw new Error('This endpoint is not a recognised read-only V2 cloud monitor.');
+    const last=Date.parse(data.meta.lastSuccess??'');
+    const stale=!Number.isFinite(last)||Date.now()-last>25*60000;
+    cloudStatus(stale?'No recent successful server scan. Check the Worker Cron Trigger and logs.':`Independent virtual account · ${data.universe} symbols in a ~${data.rotationMinutes}-minute rotation · ML: ${data.meta.modelStatus}. ${data.meta.missing?.length??0} latest data warnings.`,stale?'stale':'connected');
+    $('cloud-total').textContent=cloudNumeric(data.performance.estimatedNet);
+    $('cloud-realised').textContent=cloudNumeric(data.performance.realised);
+    $('cloud-open').textContent=Number.isInteger(data.performance.openCount)?String(data.performance.openCount):'—';
+    $('cloud-last-run').textContent=Number.isFinite(last)?utcBrief(last):'—';
+    const trades=Array.isArray(data.trades)?data.trades.slice(0,60):[];
+    $('cloud-trades').innerHTML=trades.length?trades.map(t=>`<tr><td>${utcBrief(Number(t.exitTime))}</td><td>${escape(t.strategy)}</td><td>${escape(t.symbol)}</td><td>${num(t.entryPrice,6)}</td><td>${num(t.exitPrice,6)}</td><td>${cloudNumeric(t.pnl)}</td><td>${escape(t.reason)}</td></tr>`).join(''):'<tr><td colspan="7">No completed cloud paper trades recorded yet.</td></tr>';
+  }catch(e){cloudStatus('Cloud monitor unavailable: '+e.message,'disconnected');}
+}
+
 function init(){
+  const savedWorker=localStorage.getItem('breakout-v2-cloud-worker-url');
+  if(savedWorker){cloudWorkerUrl=savedWorker;$('cloud-worker-url').value=savedWorker;refreshCloud();}
+  $('cloud-connect').addEventListener('click',()=>{cloudWorkerUrl=$('cloud-worker-url').value.trim().replace(/\/$/,'');localStorage.setItem('breakout-v2-cloud-worker-url',cloudWorkerUrl);refreshCloud();});
+  setInterval(()=>{if(!document.hidden&&cloudWorkerUrl)refreshCloud();},60000);
   $('methods').innerHTML=STRATEGIES.map((s,i)=>`<div class="method-card"><div class="ordinal">MODEL 0${i+1}</div><h3>${escape(s.name)}</h3><p>${escape(s.description)} Requires a closed hourly breakout candle; the additional filters vary by model. Every model begins with its own $10,000 simulated cash balance.</p></div>`).join('');
   $('refresh').addEventListener('click',scan);$('refresh-charts').addEventListener('click',()=>refreshVisibleCharts(true));$('filter').addEventListener('input',renderCards);$('sort').addEventListener('change',renderCards);
   selectInterval('chart-timeframes',chartInterval);selectInterval('detail-timeframes',chartInterval);

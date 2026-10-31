@@ -1,0 +1,11 @@
+{
+  "name": "trade-v2-cloud-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --test ../tests/cloud.test.mjs",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": { "wrangler": "^4.45.0" }
+}

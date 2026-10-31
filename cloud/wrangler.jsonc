@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trade-v2-monitor",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-31",
+  "workers_dev": true,
+  "triggers": { "crons": ["*/3 * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "trade-v2-paper",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ]
+}
