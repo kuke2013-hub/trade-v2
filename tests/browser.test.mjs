@@ -161,7 +161,7 @@ try{
   // The global selector switches all visible cards and persists the user's selection.
   await page.locator('#chart-timeframes button[data-interval="3m"]').click();
   await page.waitForFunction(()=>document.querySelector('.coin-card canvas[data-interval="3m"]'),{timeout:20000});
-  assert.equal(await page.evaluate(()=>localStorage.getItem('breakout-chart-interval')),'3m');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('breakout-v2-chart-interval')),'3m');
   await page.locator('#chart-timeframes button[data-interval="1m"]').click();
   await page.waitForFunction(()=>document.querySelector('.coin-card canvas[data-interval="1m"]'),{timeout:20000});
   assert.ok(['1h','1m','3m','5m','1M','1w','1d'].every(x=>seenIntervals.has(x)),'Expected requests for each supported interval');
