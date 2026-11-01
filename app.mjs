@@ -372,7 +372,9 @@ function downloadCSV(){const all=STRATEGIES.flatMap(s=>paper.portfolios[s.id].tr
 
 // Cloudflare monitor is READ-ONLY and independently funded/accounted. Nothing here can
 // arm cloud trading, reset D1 positions or merge them with local browser portfolios.
-let cloudWorkerUrl='';
+// Public read-only Worker endpoint; neither trades nor credentials can be sent over HTTP.
+const DEFAULT_CLOUD_WORKER_URL='https://trade-v2-monitor.kuletski2013.workers.dev';
+let cloudWorkerUrl=DEFAULT_CLOUD_WORKER_URL;
 function cloudStatus(text,status='disconnected'){
   $('cloud-run-state').textContent=status==='connected'?'CONNECTED · PAPER ONLY':status==='stale'?'STALE · CHECK LOGS':'NOT CONNECTED';
   $('cloud-message').textContent=text;
@@ -402,7 +404,9 @@ async function refreshCloud(){
 
 function init(){
   const savedWorker=localStorage.getItem('breakout-v2-cloud-worker-url');
-  if(savedWorker){cloudWorkerUrl=savedWorker;$('cloud-worker-url').value=savedWorker;refreshCloud();}
+  cloudWorkerUrl=savedWorker||DEFAULT_CLOUD_WORKER_URL;
+  $('cloud-worker-url').value=cloudWorkerUrl;
+  refreshCloud();
   $('cloud-connect').addEventListener('click',()=>{cloudWorkerUrl=$('cloud-worker-url').value.trim().replace(/\/$/,'');localStorage.setItem('breakout-v2-cloud-worker-url',cloudWorkerUrl);refreshCloud();});
   setInterval(()=>{if(!document.hidden&&cloudWorkerUrl)refreshCloud();},60000);
   $('methods').innerHTML=STRATEGIES.map((s,i)=>`<div class="method-card"><div class="ordinal">MODEL 0${i+1}</div><h3>${escape(s.name)}</h3><p>${escape(s.description)} Requires a closed hourly breakout candle; the additional filters vary by model. Every model begins with its own $10,000 simulated cash balance.</p></div>`).join('');
