@@ -1,0 +1,278 @@
+{
+  "schema": "confirmed-breakout-experiment-v3",
+  "research_only": true,
+  "live_ml_enabled": false,
+  "independent_out_of_sample_claim": false,
+  "diagnostic_contaminated_by_prior_v2_review": true,
+  "threshold_selection": "70th percentile of calibrated probabilities, within each strategy, from earlier threshold-calibration dates; no evaluation-return optimisation",
+  "train_target": "confirmed hourly resistance breakouts only; target-first before stop over 24 hourly candles",
+  "strategy_definitions": "matches V2 breakout, volume >=1.5x, prior compression <0.8 and volume >=1.2x, relative strength >=3pp and EMA9>EMA21>EMA50",
+  "execution": "next-hour open proxy; 0.10% fee and 0.05% slippage per side; $200 per virtual trade; max 3 positions per independent portfolio; 24h max hold; same-hour stop-first",
+  "model": "gradient_boosting",
+  "model_selection_brier": {
+    "logistic": 0.22487746242625162,
+    "gradient_boosting": 0.2234106923591468
+  },
+  "counts": {
+    "fit": 20770,
+    "model_selection": 5396,
+    "probability_calibration": 2992,
+    "threshold_calibration": 3024,
+    "reused_diagnostic": 5296,
+    "prospective_unseen": 0
+  },
+  "splits": {
+    "fit": {
+      "first": "2017-08-20T08:00:00+00:00",
+      "last": "2023-08-29T17:00:00+00:00"
+    },
+    "model_selection": {
+      "first": "2023-09-02T20:00:00+00:00",
+      "last": "2024-08-30T21:00:00+00:00"
+    },
+    "probability_calibration": {
+      "first": "2024-09-02T08:00:00+00:00",
+      "last": "2025-02-27T10:00:00+00:00"
+    },
+    "threshold_calibration": {
+      "first": "2025-03-02T00:00:00+00:00",
+      "last": "2025-08-30T15:00:00+00:00"
+    },
+    "reused_diagnostic": {
+      "first": "2025-09-02T10:00:00+00:00",
+      "last": "2026-09-29T18:00:00+00:00"
+    },
+    "prospective_unseen": {
+      "first": null,
+      "last": null
+    }
+  },
+  "candidate_count": 37545,
+  "historical_win_rate": 0.35586629378079637,
+  "thresholds": {
+    "breakout": {
+      "enabled": true,
+      "n": 3024,
+      "model_cutoff": 0.37323132240238205,
+      "volume_cutoff": 2.3467122809336973
+    },
+    "volume": {
+      "enabled": true,
+      "n": 1776,
+      "model_cutoff": 0.3833467161053165,
+      "volume_cutoff": 3.1418528278178366
+    },
+    "compression": {
+      "enabled": true,
+      "n": 417,
+      "model_cutoff": 0.37925746840278574,
+      "volume_cutoff": 2.8644190246202132
+    },
+    "strength": {
+      "enabled": true,
+      "n": 1195,
+      "model_cutoff": 0.3715822004430532,
+      "volume_cutoff": 2.412724479740311
+    }
+  },
+  "reused_diagnostic": {
+    "breakout": {
+      "unfiltered": {
+        "trades": 1710,
+        "mean_net_pct": -0.35688880316117017,
+        "win_rate": 0.34035087719298246,
+        "total_net_usd": -1220.5597068111852,
+        "max_closed_drawdown_usd": 1237.3643039639314,
+        "distinct_days": 350
+      },
+      "candidate_signals": 5296,
+      "ai_filtered": {
+        "trades": 967,
+        "mean_net_pct": -0.34878400814471483,
+        "win_rate": 0.36814891416752843,
+        "total_net_usd": -674.5482717518706,
+        "max_closed_drawdown_usd": 676.7350849386843,
+        "distinct_days": 271
+      },
+      "volume_filtered": {
+        "trades": 1103,
+        "mean_net_pct": -0.3535196619939233,
+        "win_rate": 0.3472348141432457,
+        "total_net_usd": -779.8643743585842,
+        "max_closed_drawdown_usd": 779.8643743585842,
+        "distinct_days": 298
+      },
+      "ai_minus_unfiltered_week_bootstrap": {
+        "difference_usd": 546.0114350593236,
+        "lower_5pct_usd": 330.4891395634974,
+        "upper_95pct_usd": 768.2221364536485,
+        "weeks": 57
+      },
+      "ai_minus_volume_week_bootstrap": {
+        "difference_usd": 105.31610260671633,
+        "lower_5pct_usd": -34.52517833941247,
+        "upper_95pct_usd": 242.01836713575844,
+        "weeks": 57
+      }
+    },
+    "volume": {
+      "unfiltered": {
+        "trades": 1465,
+        "mean_net_pct": -0.33224783911305555,
+        "win_rate": 0.34948805460750854,
+        "total_net_usd": -973.4861686012341,
+        "max_closed_drawdown_usd": 982.4052239916015,
+        "distinct_days": 334
+      },
+      "candidate_signals": 3571,
+      "ai_filtered": {
+        "trades": 703,
+        "mean_net_pct": -0.3726147317511133,
+        "win_rate": 0.3613086770981508,
+        "total_net_usd": -523.8963128420651,
+        "max_closed_drawdown_usd": 523.8963128420651,
+        "distinct_days": 233
+      },
+      "volume_filtered": {
+        "trades": 805,
+        "mean_net_pct": -0.36347599958885013,
+        "win_rate": 0.34782608695652173,
+        "total_net_usd": -585.1963593380451,
+        "max_closed_drawdown_usd": 587.2720470947138,
+        "distinct_days": 259
+      },
+      "ai_minus_unfiltered_week_bootstrap": {
+        "difference_usd": 449.5898557591877,
+        "lower_5pct_usd": 248.93713962950866,
+        "upper_95pct_usd": 637.6446816317791,
+        "weeks": 57
+      },
+      "ai_minus_volume_week_bootstrap": {
+        "difference_usd": 61.300046495983516,
+        "lower_5pct_usd": -95.71265041783904,
+        "upper_95pct_usd": 202.41968888612644,
+        "weeks": 57
+      }
+    },
+    "compression": {
+      "unfiltered": {
+        "trades": 476,
+        "mean_net_pct": -0.1817257101634472,
+        "win_rate": 0.38445378151260506,
+        "total_net_usd": -173.00287607560182,
+        "max_closed_drawdown_usd": 186.65119013535642,
+        "distinct_days": 185
+      },
+      "candidate_signals": 724,
+      "ai_filtered": {
+        "trades": 170,
+        "mean_net_pct": -0.3160145810208152,
+        "win_rate": 0.37058823529411766,
+        "total_net_usd": -107.44495754707728,
+        "max_closed_drawdown_usd": 107.44495754707728,
+        "distinct_days": 104
+      },
+      "volume_filtered": {
+        "trades": 180,
+        "mean_net_pct": -0.21246169226045422,
+        "win_rate": 0.3888888888888889,
+        "total_net_usd": -76.4862092137636,
+        "max_closed_drawdown_usd": 112.12605837988927,
+        "distinct_days": 104
+      },
+      "ai_minus_unfiltered_week_bootstrap": {
+        "difference_usd": 65.55791852852458,
+        "lower_5pct_usd": -39.75639579050965,
+        "upper_95pct_usd": 178.54500951621637,
+        "weeks": 56
+      },
+      "ai_minus_volume_week_bootstrap": {
+        "difference_usd": -30.958748333313647,
+        "lower_5pct_usd": -92.59982399867357,
+        "upper_95pct_usd": 29.91278928992389,
+        "weeks": 54
+      }
+    },
+    "strength": {
+      "unfiltered": {
+        "trades": 992,
+        "mean_net_pct": -0.3461891496661421,
+        "win_rate": 0.37600806451612906,
+        "total_net_usd": -686.8392729376211,
+        "max_closed_drawdown_usd": 704.7576838305423,
+        "distinct_days": 257
+      },
+      "candidate_signals": 1607,
+      "ai_filtered": {
+        "trades": 443,
+        "mean_net_pct": -0.36959705457571984,
+        "win_rate": 0.3724604966139955,
+        "total_net_usd": -327.46299035408754,
+        "max_closed_drawdown_usd": 343.6218315129291,
+        "distinct_days": 176
+      },
+      "volume_filtered": {
+        "trades": 568,
+        "mean_net_pct": -0.4023740755122838,
+        "win_rate": 0.3626760563380282,
+        "total_net_usd": -457.09694978195427,
+        "max_closed_drawdown_usd": 461.4845621695669,
+        "distinct_days": 191
+      },
+      "ai_minus_unfiltered_week_bootstrap": {
+        "difference_usd": 359.3762825835383,
+        "lower_5pct_usd": 171.42042200498244,
+        "upper_95pct_usd": 568.7890220867677,
+        "weeks": 57
+      },
+      "ai_minus_volume_week_bootstrap": {
+        "difference_usd": 129.63395942786673,
+        "lower_5pct_usd": 34.84475151438584,
+        "upper_95pct_usd": 235.30516729135852,
+        "weeks": 55
+      }
+    }
+  },
+  "data_provenance": {
+    "origin": "https://data.binance.vision",
+    "archives_verified": 1779,
+    "manifest_sha256": "a36fb2bc7da38655d24b28096f9a978520ea50736e70e4f397f0a31caea49926",
+    "symbols_available": {
+      "BTCUSDT": 79794,
+      "ETHUSDT": 79794,
+      "BNBUSDT": 77858,
+      "XRPUSDT": 73633,
+      "ADAUSDT": 74045,
+      "LTCUSDT": 76970,
+      "DOGEUSDT": 63425,
+      "TRXUSDT": 72718,
+      "LINKUSDT": 67491,
+      "SOLUSDT": 53783,
+      "AVAXUSDT": 52775,
+      "NEARUSDT": 52248,
+      "DOTUSDT": 53598,
+      "ATOMUSDT": 65031,
+      "UNIUSDT": 52898,
+      "FILUSDT": 52212,
+      "ETCUSDT": 72713,
+      "ALGOUSDT": 63749,
+      "FTTUSDT": 51948,
+      "LUNAUSDT": 53102
+    },
+    "history_requested": "2017-08 to 2026-09",
+    "noncommercial_research_only": true
+  },
+  "caveats": [
+    "The 2025-26 evaluation period was reviewed in the previous V2 experiment and is NOT an untouched holdout.",
+    "Training/review decisions were influenced by the prior 2025-26 findings; prospective data beyond 2026-09 is necessary for independent validation.",
+    "Hour OHLC does not reveal stop/target order within the same candle (stop-first) or historic best ask spread.",
+    "Only a fixed subset of Binance symbols is included; missing and delisted assets may cause survivorship bias.",
+    "Day/week bootstrap is approximate and does not account for full market regime autocorrelation.",
+    "This report cannot switch on live or paper ML trading. No model parameters are written to models/latest.json."
+  ],
+  "reused_diagnostic_probability": {
+    "brier": 0.2291572383503505,
+    "constant_baseline_brier": 0.23042464800519685,
+    "auc": 0.5316838302890732
+  }
+}
