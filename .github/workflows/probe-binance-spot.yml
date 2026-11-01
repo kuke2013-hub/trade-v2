@@ -11,38 +11,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Test official Binance public hourly candles without trading
+      - name: Validate hourly and minute market candles plus book ask on Binance's public market-data host
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          const hosts = [
-            'https://api-gcp.binance.com',
-            'https://data-api.binance.vision',
-            'https://api.binance.com'
+          const base = 'https://data-api.binance.vision/api/v3/';
+          const probes = [
+            {name:'90 completed-or-forming hourly candles',path:'klines?symbol=BTCUSDT&interval=1h&limit=90',
+              valid:x=>Array.isArray(x)&&x.length===90&&x.every(row=>Array.isArray(row)&&row.length>=7)},
+            {name:'10 one-minute candles',path:'klines?symbol=BTCUSDT&interval=1m&limit=10',
+              valid:x=>Array.isArray(x)&&x.length===10&&x.every(row=>Array.isArray(row)&&row.length>=7)},
+            {name:'best bid and ask',path:'ticker/bookTicker?symbol=ETHUSDT',
+              valid:x=>+x?.askPrice>0&&+x?.bidPrice>0&&+x.askPrice>=+x.bidPrice}
           ];
-          const path = '/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=90';
-          let success = 0;
-          for (const host of hosts) {
-            try {
-              const res = await fetch(host + path, {
-                signal: AbortSignal.timeout(12000),
-                headers: { 'Accept': 'application/json' }
-              });
-              let valid = false;
-              let details = '';
-              if (res.ok) {
-                const body = await res.json();
-                valid = Array.isArray(body) && body.length === 90 &&
-                  body.every(row => Array.isArray(row) && row.length >= 7);
-                if (valid) success++;
-              } else {
-                details = (await res.text()).replace(/[\r\n]+/g, ' ').slice(0, 180);
-              }
-              console.log(JSON.stringify({ host: new URL(host).hostname, status: res.status, valid, details }));
-            } catch (e) {
-              console.log(JSON.stringify({ host: new URL(host).hostname, error: String(e.message).slice(0, 140) }));
+          let failed=0;
+          for (const p of probes){
+            try{
+              const r=await fetch(base+p.path,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(15000)});
+              const data=r.ok?await r.json():null;
+              const valid=r.ok&&p.valid(data);
+              console.log(JSON.stringify({probe:p.name,httpStatus:r.status,valid}));
+              if(!valid)failed++;
+            }catch(e){
+              console.log(JSON.stringify({probe:p.name,error:String(e.message)}));
+              failed++;
             }
           }
-          console.log('Accessible official Spot endpoints: ' + success + '/' + hosts.length);
-          if (success === 0) process.exitCode = 1;
+          if(failed)process.exitCode=1;
           NODE
