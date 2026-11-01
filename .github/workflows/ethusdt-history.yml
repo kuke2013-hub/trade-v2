@@ -1,0 +1,48 @@
+name: Build verified ETHUSDT Spot historical research dataset
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/ethusdt-history.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ethusdt-history
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download SHA256-verified monthly and daily ETHUSDT spot archives
+        run: python research/ethusdt_snapshot.py
+      - name: Publish canonical ETHUSDT historical candles and manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ethusdt_history/
+          if git diff --cached --quiet; then
+            echo "Dataset already up to date."
+            exit 0
+          fi
+          git commit -m "Update verified ETHUSDT spot hourly and daily research history"
+          for retry in 1 2 3; do
+            git pull --rebase origin main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Failed to publish dataset after three attempts." >&2
+          exit 1
