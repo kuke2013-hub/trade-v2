@@ -1,0 +1,49 @@
+name: V3 confirmed-breakout AI filter experiment (research only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'research_v3/**'
+      - 'tests/test_confirmed_v3.py'
+      - '.github/workflows/research-confirmed-v3.yml'
+permissions:
+  contents: read
+concurrency:
+  group: binance-confirmed-v3-research
+  cancel-in-progress: false
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install research dependencies
+        run: python -m pip install --disable-pip-version-check -r research/requirements.txt
+      - name: Verify isolated v3 tests and existing historical parser tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: binance-vision-hourly-${{ hashFiles('config/universe.txt', 'research/pipeline.py') }}-confirmed-v3-${{ github.run_id }}
+          restore-keys: |
+            binance-vision-hourly-${{ hashFiles('config/universe.txt', 'research/pipeline.py') }}-
+      - name: Download checksum-verified authentic historical data and compare AI with original strategies
+        run: |
+          python research_v3/confirmed_breakouts.py \
+            --symbols config/universe.txt \
+            --start 2017-08 --end 2026-09 --workers 12 \
+            --report models/experiments/confirmed_breakouts_v3.json \
+            --model models/experiments/confirmed_breakouts_v3_model.json
+      - name: Attach research report and isolated model — never deploy to live ML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: confirmed-breakouts-v3-experiment
+          path: |
+            models/experiments/confirmed_breakouts_v3.json
+            models/experiments/confirmed_breakouts_v3_model.json
+          if-no-files-found: ignore
