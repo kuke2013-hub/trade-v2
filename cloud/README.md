@@ -1,50 +1,39 @@
-# Cloudflare Worker: unattended V2 paper research
+# Trade V2 — unattended Binance Spot paper experiment
 
-This Worker is an **independent, server-side, paper-only** experiment. It has no Binance account credentials and no exchange order-submission endpoint. It does not import or replace your browser-local V2 paper history. The original V1 repository remains unchanged.
+**Implemented, but gated until you configure the shared secret and enable scheduled GitHub collection.**
 
-**Status:** Source is prepared, but the Worker is **not deployed or scheduled** until a Cloudflare D1 database is created and the Worker is deployed to your account. GitHub–Cloudflare account linking alone does not deploy this service.
+Architecture: **GitHub Actions (every five minutes) → official Binance public Spot data → existing V2 paper engine → authenticated HTTPS API → Cloudflare D1 → GitHub Pages dashboard**. No exchange account/API key, no real orders. A first connection probe on GitHub Actions returned HTTP 200 for hourly candles, minute candles, and a best bid/ask quote from `data-api.binance.vision` on 1 November 2026. This is an observation from one runner, not a guarantee of ongoing market-data access.
 
-## Cloudflare setup (one-time, Free-plan pilot)
+Cloudflare Cron Triggers were deliberately disabled (`"crons": []`) because Cloudflare's scheduled executions received Binance HTTP 451 (regional restriction). **Do not re-enable the Cloudflare Cron**; GitHub is the collector. The Cloudflare Worker is now a persistent **storage API only**, protected for writes by a strong secret. This is a noncommercial research-only, paper simulation. V1 is untouched.
 
-1. In [Cloudflare D1](https://dash.cloudflare.com/?to=/:account/workers/d1), select **Create database**. Name it exactly `trade-v2-paper`. Copy its UUID **Database ID**. The UUID is not a password.
-2. In GitHub `kuke2013-hub/trade-v2`, open `cloud/wrangler.jsonc`, click Edit, and replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` with the UUID. Commit this one-line change. Alternatively share only the database UUID with the assistant so it can update the config through GitHub. **Never share your Cloudflare API tokens or passwords.**
-3. In [Cloudflare Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages), choose **Create application → GitHub**, and import `kuke2013-hub/trade-v2`. Set the **root directory to `cloud`**, and **Worker name to `trade-v2-monitor`** (the name must match `wrangler.jsonc`). Build/deploy command `npx wrangler deploy`; dependency install `npm install` if prompted. Cloudflare Workers Builds will then deploy the Worker from GitHub pushes.
-4. Confirm the scheduled Cron Trigger `*/3 * * * *` and the D1 binding `DB` exist in the deployed Worker. The Worker automatically creates the `cloud_state` table on the first scheduled or status request, so no SQL migration is required for this first release.
-5. Test `https://trade-v2-monitor.<your-workers-subdomain>.workers.dev/health` which should return `"dbBound":true`. After successful scheduled runs, `/api/status` will return a non-null `meta.lastSuccess`. In the V2 GitHub Pages dashboard, enter the Worker base URL into **Cloudflare paper monitor → Worker HTTPS URL** and select **Connect & refresh**.
-6. Verify Cloudflare usage, Worker logs and Cron Triggers. The first few scheduled ticks may scan only a subset; this is by design. No simulation is retroactively backfilled if it was offline.
+## One-time secure activation
 
-## Conservative budget and correctness
+1. Create a random **shared secret locally** on your Mac using Terminal: `openssl rand -hex 32`. Copy its 64-character output. **Do not paste it into ChatGPT, a repository file, or a public issue.**
+2. Cloudflare → Workers & Pages → `trade-v2-monitor` → **Settings → Variables and Secrets → Add**. Choose **Secret** (not plaintext); name `TRADE_V2_INGEST_TOKEN`, value the secret from step 1. Save/deploy it. Keep the existing `DB` binding to D1 `trade-v2-paper`.
+3. GitHub → `kuke2013-hub/trade-v2` → **Settings → Secrets and variables → Actions → Secrets → New repository secret**. Name exactly `TRADE_V2_INGEST_TOKEN`, with **the same secret value**.
+4. Confirm Cloudflare Worker deployment has ingested this code and that [`/health`](https://trade-v2-monitor.kuletski2013.workers.dev/health) returns `collectorSecretConfigured: true`. Its public `/api/status` endpoint must still work; `/api/state` without auth should return 401 (never public).
+5. GitHub → **Actions → V2 unattended Binance paper collector (five-minute pilot) → Run workflow**. Inspect the run log. A successful authenticated run reports a JSON object with `scanned`, `revision`, `marketDataHost:'data-api.binance.vision'`. It never prints the secret. Inspect the public [`/api/status`](https://trade-v2-monitor.kuletski2013.workers.dev/api/status) after the run. `meta.lastSuccess` must be populated, `meta.collector` must read `github-actions`, and `meta.lastScanCount` must be > 0.
+6. **Only after step 5 succeeds**, in GitHub **Settings → Secrets and variables → Actions → Variables**, create repository variable `TRADE_V2_COLLECTOR_ENABLED` with value `true`. That enables the five-minute schedule. Remove the variable or set it to `false` to pause scheduled collection, without resetting D1 history. Manual workflow runs remain possible.
 
-- Cron interval: **every 3 minutes**. A deterministic **17-pair** universe is divided into 5 shards; each pair is scanned roughly every **15 minutes**. BTCUSDT is fetched on every tick as the benchmark. This does **not** monitor all 360 pairs of the browser dashboard and may miss very short-lived opportunities.
-- Entries use a fresh Binance spot best ask, completed 1-hour candles, the four existing rule-based strategy conditions, $200 per model virtual trade, a $10,000 starting virtual account per strategy, three open positions per strategy, +2% target, −1.5% stop, 24h maximum hold, 0.10% fees per side and 0.05% slippage per side.
-- Exits are checked against completed Binance 1-minute candles on each tick, not live order-book ticks. If stop and target occur in one minute, the stop is assumed first. Data gaps are explicitly flagged. If prices are missing, no estimated open P&L is invented.
-- A fifth ML strategy is eligible only if `models/latest.json` is published **and** `holdout.accepted === true` **and** the current signal passes the calibration-selected probability threshold. The recovered first model is **holdout-rejected**, so fifth-model paper trading must remain disabled.
-- D1 holds a single persistent JSON research state with revision-checked compare-and-swap writes, preventing duplicate state commits from overlapping Cron invocations. Public GET endpoints provide only simulated status/trade information; HTTP requests cannot trigger trades or reset accounts.
-- Current free Workers limits include **10 ms CPU time** and **50 external subrequests** per invocation, so benchmark real Worker usage. The workload is intentionally small and **free operation is not guaranteed** if real usage or traffic exceeds Cloudflare limits.
-- This is for **noncommercial research**. Review Binance Vision historical-data terms before using historical-derived models commercially or placing live orders.
+The fixed Worker URL is `https://trade-v2-monitor.kuletski2013.workers.dev`. The V2 dashboard knows it automatically. It reads cloud results from `/api/status`; never requires the secret and cannot place trades or alter D1.
 
-## Binance market-data connectivity and 403 diagnosis
+## Integrity and constraints
 
-If `/api/status` reports `lastSuccess: null` and an HTTP 403 from Binance, **no paper-trade signals have been processed**. The Worker fails closed: it does not manufacture prices or treat an unsuccessful tick as a successful scan. The status error now identifies attempted Binance Spot hosts and HTTP codes.
+- GitHub Actions uses a bounded **17-symbol USDT Spot universe** and checks each symbol every completed scheduled run. **5-minute scheduling is best-effort**; GitHub can delay or drop runs, so heartbeat freshness in the dashboard is essential.
+- Signals use only completed 1h candles, prior 24h resistance and the four original rule-based strategies. Exits use available completed 1m Binance candles and conservative stop-first tie handling. Starting virtual balances: $10,000 in each of 5 distinct research portfolios ($50,000 total); $200 notional per entry, max 3 positions per strategy; +2% target, −1.5% stop, 24h exit timeout, 0.1% simulated fees/side, 0.05% simulated slippage/side.
+- The fifth ML portfolio is **disabled** because the recovered real historical model did not pass its holdout trading gate. No model probability is a guarantee or evidence of a positive net-trading edge.
+- Binance data host is intentionally limited to `https://data-api.binance.vision` on GitHub because it responded to the required public endpoints. Binance HTTP 429, 451, missing BTC benchmark, or other failures **do not trigger trades or update success timestamps**. No proxy, location bypass, or exchange substitution is attempted.
+- Cloudflare's publicly accessible HTTP Worker **does not fetch Binance or run paper trades**. Its only protected operations are `GET /api/state` and `POST /api/commit`, both requiring a 32+ character **secret** (`Authorization: Bearer`). Commit validates the D1 revision (optimistic concurrency), checked run ID, unchanged portfolio history, no reset, and a nonempty full-universe Binance scan. Replayed run IDs are idempotent.
+- The token lives in **GitHub Actions Secrets** and a **Cloudflare Worker Secret**, never in source code, logs or the browser. If leaked, rotate both secrets. The Worker's D1 ID is not confidential.
+- Cloudflare Free CPU limits and GitHub Actions availability apply. A successful simulated trade is not a measured net live-execution advantage; minute candles cannot reproduce the exact historical fill order or market depth.
+- This project is noncommercial research, subject to Binance's data terms and applicable regional eligibility rules. Avoid live trading or redistributing Binance Vision datasets without confirming the requisite permissions.
 
-The Worker checks only official Binance Spot market-data endpoints (`data-api.binance.vision`, `api.binance.com`, `api-gcp.binance.com`, `api1.binance.com`). The Cloudflare diagnostic confirmed the officially documented `api-gcp.binance.com` host works, while other hosts returned 403 or 451, so this deployment starts with `api-gcp.binance.com`. It can fall back to another official host for retryable errors only. HTTP 418/429 rate blocks and HTTP 451 location restrictions stop retrying; no proxy or geographic restriction bypass is attempted. No other exchange or proxy is used.
+## Source and workflow
 
-Inspect the read-only `/api/binance-diagnostics` endpoint to see whether each official host can return two authentic BTCUSDT hourly candles from Cloudflare. The endpoint **does not run a trading scan, submit an order or touch D1 state**. A successful diagnostic by itself does not establish a successful scheduled tick; inspect `/api/status` and a fresh `meta.lastSuccess` timestamp. If all hosts fail, the experimental server-side feed remains blocked; use an explicitly permitted alternative deployment environment rather than fabricating data.
+- `cloud/collector.mjs`: unattended GitHub runner; uses the **same `tick()`**/paper engine as V2, with all 17 eligible pairs and the official, permitted Binance market-data host. Authenticated state read + compare-and-swap D1 commit.
+- `cloud/worker.mjs`: read-only public `/health`, `/api/status`, `/api/binance-diagnostics`; secret-protected `/api/state` and `/api/commit`; no live trading.
+- `.github/workflows/collect-paper.yml`: manual pilot and optional gated every-five-minute schedule. No repository write permission.
+- `cloud/wrangler.jsonc`: D1 binding and `triggers: { crons: [] }`.
+- `tests/cloud.test.mjs`: deterministic synthetic-fixture tests for tick logic, secrets, D1 read/write, replay and stale-write rejection. Synthetic fixtures are **never** production data.
 
-## API
-
-- `GET /health`: Worker deployed, D1 binding present.
-- `GET /api/binance-diagnostics`: fixed-target official Binance Spot connectivity check (read-only, no state mutation).
-- `GET /api/status`: cloud simulation P&L, open positions, up to 100 closed trades, last successful scan, latest API errors, model gate status, and per-strategy totals.
-- All other paths return 404; non-GET methods return 405. The read-only API returns CORS headers for the user's GitHub Pages domain.
-
-## Local checks
-
-From repository root:
-
-```bash
-node --test tests/cloud.test.mjs
-node --test tests/engine.test.mjs tests/ml.test.mjs tests/trade-chart.test.mjs tests/cloud.test.mjs
-```
-
-This Worker's code uses the existing `engine.mjs` and `ml.mjs` directly to avoid divergence in entry, risk and model calculations. Its local deterministic tests use fixture exchange data only and do not claim production uptime, exchange access, or trading profitability.
+Local tests from repository root: `node --test tests/engine.test.mjs tests/trade-chart.test.mjs tests/ml.test.mjs tests/cloud.test.mjs`.

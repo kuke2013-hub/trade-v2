@@ -155,16 +155,94 @@ test('read-only diagnostic checks real kline shape per official endpoint',async(
   assert.equal(diagnostic.results[1].validBinanceKlines,true);
 });
 
-test('diagnostics can probe the precise 90-candle scheduled request without entering paper trades',async()=>{
-  const requested=[];
-  const diagnostics=await binanceDiagnostics(async input=>{
-    const u=new URL(input);
-    requested.push(u.searchParams.get('limit'));
-    if(u.hostname==='api-gcp.binance.com')return {ok:true,status:200,json:async()=>klines('BTCUSDT')};
-    return {ok:false,status:451};
-  },90);
-  assert.equal(diagnostics.requestLimit,90);
-  assert.deepEqual(requested,Array(BINANCE_API_HOSTS.length).fill('90'));
-  assert.equal(diagnostics.results.find(r=>r.host==='api-gcp.binance.com').validBinanceKlines,true);
-  assert.equal(diagnostics.results.filter(r=>r.validBinanceKlines).length,1);
+// Authenticated GitHub->D1 transport tests use real, deterministic paper-engine transitions.
+test('D1 writer is sealed: missing secret, invalid secret and unauthenticated writes fail',async()=>{
+  const {default:worker}=await import('../cloud/worker.mjs');
+  const DB=fakeDB(),valid='a'.repeat(64);
+  const url='https://worker.test/api/state';
+  assert.equal((await worker.fetch(new Request(url),{DB})).status,503);
+  assert.equal((await worker.fetch(new Request(url),{DB,TRADE_V2_INGEST_TOKEN:valid})).status,401);
+  assert.equal((await worker.fetch(new Request(url,{headers:{Authorization:'Bearer wrong'}}),{DB,TRADE_V2_INGEST_TOKEN:valid})).status,401);
+  assert.equal((await worker.fetch(new Request('https://worker.test/api/commit',{method:'POST',body:'{}'}),{DB,TRADE_V2_INGEST_TOKEN:valid})).status,401);
+  const auth=new Request(url,{headers:{Authorization:`Bearer ${valid}`}});
+  const response=await worker.fetch(auth,{DB,TRADE_V2_INGEST_TOKEN:valid});
+  assert.equal(response.status,200);
+  const full=await response.json();assert.equal(full.revision,0);
+  assert.equal(full.state.paper.portfolios.ml.positions.length,0);
+  assert.equal(typeof worker.scheduled,'undefined','Cloudflare Cron handler must be removed');
+});
+
+test('authenticated D1 commit requires a real full-market scan and rejects stale revisions or resetting balances',async()=>{
+  const {default:worker,CLOUD_PAIRS}=await import('../cloud/worker.mjs');
+  const DB=fakeDB(),secret='b'.repeat(64),env={DB,TRADE_V2_INGEST_TOKEN:secret};
+  const headers={Authorization:`Bearer ${secret}`,'Content-Type':'application/json'};
+  const read=await (await worker.fetch(new Request('https://worker.test/api/state',{headers}),env)).json();
+  const {fetcher}=fixture();
+  const after=await tick(read.state,START,fetcher,{allPairs:true,marketHosts:['https://data-api.binance.vision']});
+  assert.equal(after.meta.lastScanCount,CLOUD_PAIRS.length);
+  assert.equal(after.meta.marketDataHost,'data-api.binance.vision');
+  assert.equal(after.meta.collector,'github-actions');
+  const url='https://worker.test/api/commit';
+  const body={baseRevision:read.revision,runId:'123456-1',state:after};
+  const post=async payload=>worker.fetch(new Request(url,{method:'POST',headers,body:JSON.stringify(payload)}),env);
+  const accepted=await post(body);
+  assert.equal(accepted.status,200);
+  assert.equal((await accepted.json()).revision,1);
+  assert.equal(DB.state.paper.portfolios.breakout.positions.length,1);
+  const second=await post(body);
+  assert.equal(second.status,200,'replay of the same run must be idempotent');
+  const emptyReset=structuredClone(after);
+  emptyReset.paper.portfolios.breakout.positions=[];
+  emptyReset.meta.lastRun=new Date(START+300000).toISOString();emptyReset.meta.lastSuccess=emptyReset.meta.lastRun;
+  assert.equal((await post({baseRevision:1,runId:'123457-1',state:emptyReset})).status,422);
+  assert.equal((await post({baseRevision:0,runId:'123458-1',state:after})).status,409);
+  assert.equal(DB.state.paper.portfolios.breakout.positions.length,1,'rejected state must never overwrite D1');
+});
+
+test('GitHub collector retrieves authenticated state, computes real fixture signals, and commits once',async()=>{
+  const {default:worker}=await import('../cloud/worker.mjs');
+  const {collectOnce}=await import('../cloud/collector.mjs');
+  const secret='c'.repeat(64),DB=fakeDB(),{fetcher:markets,called}=fixture();
+  const transport=async(url,options={})=>{
+    if(new URL(url).host==='trade-v2-monitor.kuletski2013.workers.dev'){
+      return worker.fetch(new Request(url,options),{DB,TRADE_V2_INGEST_TOKEN:secret});
+    }
+    return markets(url,options);
+  };
+  const result=await collectOnce({token:secret,runId:'87654321-1',now:START,fetcher:transport});
+  assert.equal(result.scanned,CLOUD_PAIRS.length);
+  assert.equal(result.marketDataHost,'data-api.binance.vision');
+  assert.equal(result.revision,1);
+  assert.equal(DB.state.paper.portfolios.breakout.positions.length,1);
+  assert.equal(DB.state.meta.lastGitHubRunId,'87654321-1');
+  assert.equal(called.filter(s=>s.includes('/klines?')).length,18);
+  assert.ok(called.filter(s=>s.includes('/api/v3/')).every(s=>s.startsWith('https://data-api.binance.vision/')));
+  const repeated=await collectOnce({token:secret,runId:'87654321-1',now:START,fetcher:transport});
+  assert.equal(repeated.duplicate,true);
+  assert.equal(repeated.revision,1);
+});
+
+test('failed Binance feed cannot write a GitHub collector trade state',async()=>{
+  const {default:worker}=await import('../cloud/worker.mjs');
+  const {collectOnce}=await import('../cloud/collector.mjs');
+  const secret='d'.repeat(64),DB=fakeDB();
+  const fetcher=async(url,init={})=>new URL(url).host.endsWith('.workers.dev')
+    ?worker.fetch(new Request(url,init),{DB,TRADE_V2_INGEST_TOKEN:secret})
+    :{ok:false,status:451};
+  await assert.rejects(()=>collectOnce({token:secret,runId:'87654321-1',now:START,fetcher}),/Cannot safely evaluate market signals/);
+  assert.equal(DB.state?.paper.portfolios.breakout.positions.length,0);
+  assert.equal(DB.state?.meta.lastSuccess,null);
+});
+
+
+test('90-candle diagnostics verify the exact scheduled market-request shape',async()=>{
+  const responses=await binanceDiagnostics(async input=>({ok:true,status:200,json:async()=>klines('BTCUSDT')}),90);
+  assert.equal(responses.requestLimit,90);
+  assert.equal(responses.results.length,BINANCE_API_HOSTS.length);
+  assert.equal(responses.results.every(x=>x.validBinanceKlines),true);
+});
+
+test('stale benchmark candles fail closed without paper signals',async()=>{
+  const {fetcher}=fixture(START);
+  await assert.rejects(()=>tick(blank(),START+4*H,fetcher,{allPairs:true,marketHosts:['https://data-api.binance.vision']}),/BTC hourly feed is stale/);
 });

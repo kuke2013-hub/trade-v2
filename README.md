@@ -94,6 +94,10 @@ The first historical training completed against **1,779 checksum-verified monthl
 
 The original training GitHub Action failed *after* training because a concurrent code commit made its `git push` non-fast-forward. Model and report were recovered from the exact GitHub Actions workflow artifact, without re-training, and the workflow was adjusted to rebase before publication on future runs. This is a restored research record, not a newly inferred or fabricated score.
 
-## Cloudflare optional independent 24/7 paper pilot
+## Unattended GitHub + Cloudflare paper collector (pilot)
 
-V2 includes a standalone [Cloudflare Worker implementation](cloud/README.md) for paper-trading a small rotating cohort without leaving the browser open. It uses a Cloudflare D1 database and scheduled Cron Triggers. It is **not active solely by connecting GitHub to a Cloudflare account**: the user must create a D1 database, enter its database ID in `cloud/wrangler.jsonc`, and deploy the Worker through Cloudflare Workers Builds. The existing GitHub Pages website remains independently available, and its browser-local portfolio ledger remains separate from cloud paper trades.
+Trade V2 now contains a gated [five-minute GitHub Actions Binance data collector and secure Cloudflare D1 storage](cloud/README.md). This replaces the Cloudflare Cron approach because Cloudflare Cron requests received a Binance HTTP 451, while a GitHub runner successfully retrieved Binance hourly and minute candles and best bid/ask quotes.
+
+**This is not active until the same strong secret is stored privately in both GitHub Actions Secrets and the Cloudflare Worker Secrets, a manual test workflow passes, and GitHub repository variable `TRADE_V2_COLLECTOR_ENABLED` is set to `true`.** The Cloudflare Worker has no cron trigger and never places trades. Its public dashboard API is read-only; the authenticated writer uses D1 optimistic concurrency checks and a GitHub run id. The original V1 and the browser-only V2 paper portfolios are untouched.
+
+The ML model remains holdout-rejected and cannot open ML paper trades. GitHub Actions scheduling is best-effort, not guaranteed five-minute execution; market-data access, trading performance and free-tier capacity require ongoing monitoring.
