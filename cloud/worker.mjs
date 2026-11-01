@@ -11,7 +11,15 @@ export const CLOUD_PAIRS = Object.freeze([
 ]);
 export const SHARDS = 5;
 const PERIOD = 180000; // 3-minute CRON; full coin universe scanned roughly every 15 minutes
-const API = 'https://data-api.binance.vision/api/v3/';
+// Official Binance Spot endpoints only. No third-party prices, proxies or invented fills.
+// Every URL below is listed in Binance's public Spot REST documentation.
+export const BINANCE_API_HOSTS = Object.freeze([
+  'https://data-api.binance.vision',
+  'https://api.binance.com',
+  'https://api-gcp.binance.com',
+  'https://api1.binance.com'
+]);
+const RETRYABLE_HTTP = new Set([403, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 const MODEL_URL = 'https://kuke2013-hub.github.io/trade-v2/models/latest.json';
 const STARTED_CASH = 10000;
 const MAX_POSITION_AGE_GAP = 950 * 60000;
@@ -20,7 +28,47 @@ const MAX_TRADES_RESPONSE = 100;
 function emptyState(){return {paper:createState(),meta:{lastRun:null,lastSuccess:null,lastError:null,lastBatch:[],lastScanCount:0,missing:[],modelStatus:'unavailable',lastMarketPriceAt:null,markPrices:{}}};}
 export function subset(now, pairs=CLOUD_PAIRS){const shard=Math.floor(now/PERIOD)%SHARDS;return {shard, symbols:pairs.filter((_,i)=>i%SHARDS===shard)};}
 function validPrice(p){return Number.isFinite(p)&&p>0;}
-async function getJSON(path,fetcher=fetch){const response=await fetcher(API+path,{headers:{'Accept':'application/json'}});if(!response.ok)throw new Error(`Binance ${response.status} /${path.split('?')[0]}`);return response.json();}
+/** Official-host failover within one scheduled invocation. Never retry 418/429 rate bans
+    or 451 geographic restrictions; failing closed preserves paper-trading integrity. */
+export function marketDataClient(fetcher=fetch, hosts=BINANCE_API_HOSTS){
+  let preferred=0, lastHost=null;
+  async function get(path){
+    const indices=[preferred,...hosts.map((_,i)=>i).filter(i=>i!==preferred)];
+    const failures=[];
+    for(const i of indices){
+      const host=hosts[i];
+      let response;
+      try{response=await fetcher(`${host}/api/v3/${path}`,{headers:{Accept:'application/json'}});}
+      catch(error){failures.push(`${new URL(host).host}:network`);continue;}
+      if(response.ok){
+        // Malformed JSON is not interpreted as valid market data.
+        const value=await response.json();
+        preferred=i;lastHost=new URL(host).host;
+        return value;
+      }
+      const status=Number(response.status);
+      failures.push(`${new URL(host).host}:${status}`);
+      if(!RETRYABLE_HTTP.has(status))break;
+    }
+    throw new Error(`Binance official market-data endpoints failed /${path.split('?')[0]} [${failures.join(', ')}]`);
+  }
+  return {get,get lastHost(){return lastHost;}};
+}
+
+/** Read-only, fixed-target connectivity check; never enters trades. */
+export async function binanceDiagnostics(fetcher=fetch){
+  const results=[];
+  for(const base of BINANCE_API_HOSTS){
+    const host=new URL(base).host;
+    try{
+      const response=await fetcher(`${base}/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=2`,{headers:{Accept:'application/json'}});
+      let valid=false;
+      if(response.ok){try{const body=await response.json();valid=Array.isArray(body)&&body.length===2&&body.every(v=>Array.isArray(v)&&v.length>=7);}catch{valid=false;}}
+      results.push({host,httpStatus:response.status,validBinanceKlines:valid});
+    }catch{results.push({host,httpStatus:null,validBinanceKlines:false,error:'network request failed'});}
+  }
+  return {source:'Official Binance Spot market data',checkedAt:new Date().toISOString(),results};
+}
 async function externalModel(fetcher){try{
   const response=await fetcher(MODEL_URL,{headers:{Accept:'application/json'}});
   if(!response.ok)return null;
@@ -32,7 +80,7 @@ function signalStrategies(analysis,model,coinBars,btcBars){
   if(model?.holdout?.accepted && analysis.breakout){const f=mlFeatures(coinBars,btcBars);const p=f?probability(model,f):null;if(modelAllowsPaper(model,p))ids.push('ml');}
   return ids;
 }
-async function accountExits(state,now,fetcher){
+async function accountExits(state,now,getMarket){
   const positions=STRATEGIES.flatMap(s=>state.paper.portfolios[s.id].positions);
   const grouped=new Map();for(const p of positions){if(!grouped.has(p.symbol))grouped.set(p.symbol,[]);grouped.get(p.symbol).push(p);}
   const problems=[];
@@ -40,7 +88,7 @@ async function accountExits(state,now,fetcher){
     const oldest=Math.min(...positions.map(p=>p.lastChecked));
     if(now-oldest>MAX_POSITION_AGE_GAP){positions.forEach(p=>p.dataGap=true);problems.push(`${symbol}: more than 950 minutes since last verified exit data`);continue;}
     try{
-      const raw=await getJSON(`klines?symbol=${symbol}&interval=1m&startTime=${Math.max(0,oldest-60000)}&limit=1000`,fetcher);
+      const raw=await getMarket(`klines?symbol=${symbol}&interval=1m&startTime=${Math.max(0,oldest-60000)}&limit=1000`);
       const bars=parseKlines(raw,now);if(!bars.length){problems.push(`${symbol}: no completed 1m bars`);continue;}
       const earliest=bars[0].time;
       for(const position of positions){
@@ -60,10 +108,12 @@ export async function tick(state,now,fetcher=fetch){
   const {shard,symbols}=subset(now);
   const next=structuredClone(state);
   const failures=[];
+  const market=marketDataClient(fetcher);
   // Existing positions must be checked even when no fresh breakout exists.
-  failures.push(...await accountExits(next,now,fetcher));
+  const exitGaps=await accountExits(next,now,market.get);
+  failures.push(...exitGaps);
   let btcBars=[];
-  try{btcBars=parseKlines(await getJSON('klines?symbol=BTCUSDT&interval=1h&limit=90',fetcher),now);if(btcBars.length<55)throw new Error('BTC hourly benchmark unavailable');}
+  try{btcBars=parseKlines(await market.get('klines?symbol=BTCUSDT&interval=1h&limit=90'),now);if(btcBars.length<55)throw new Error('BTC hourly benchmark unavailable');}
   catch(e){throw new Error('Cannot safely evaluate market signals: '+e.message);}
   const btcRet24=(btcBars.at(-1).close/btcBars.at(-25).close-1)*100;
   const model=await externalModel(fetcher);
@@ -71,16 +121,16 @@ export async function tick(state,now,fetcher=fetch){
   let checked=0;
   for(const symbol of symbols){
     let series;
-    try{series=parseKlines(await getJSON(`klines?symbol=${symbol}&interval=1h&limit=90`,fetcher),now);}
+    try{series=parseKlines(await market.get(`klines?symbol=${symbol}&interval=1h&limit=90`),now);}
     catch(e){failures.push(`${symbol}: ${e.message}`);continue;}
     const analysis=analyse(series,btcRet24);
     if(!analysis){failures.push(`${symbol}: insufficient hourly history`);continue;}
     checked++;
     if(analysis.lastBarTime<now-15*60000||analysis.lastBarTime>now||!analysis.breakout)continue;
     const strategyIds=signalStrategies(analysis,model,series,btcBars);
-    if(!strategyIds.length)continue;
+    if(!strategyIds.length || exitGaps.length)continue; // fail closed if an existing position cannot be monitored
     try{
-      const quote=await getJSON(`ticker/bookTicker?symbol=${symbol}`,fetcher);
+      const quote=await market.get(`ticker/bookTicker?symbol=${symbol}`);
       const ask=Number(quote.askPrice),bid=Number(quote.bidPrice);
       if(!validPrice(ask)||!validPrice(bid)||ask<bid)throw new Error('Invalid Binance bid-ask quote');
       for(const strategy of strategyIds)openPaper(next.paper,strategy,symbol,ask,analysis.lastBarTime,now);
@@ -89,8 +139,8 @@ export async function tick(state,now,fetcher=fetch){
   // Mark open positions only when current quotes exist; don't invent unrealised P&L.
   const openSymbols=[...new Set(STRATEGIES.flatMap(s=>next.paper.portfolios[s.id].positions.map(p=>p.symbol)))];
   const markPrices={};
-  for(const symbol of openSymbols){try{const quote=await getJSON(`ticker/bookTicker?symbol=${symbol}`,fetcher);const bid=Number(quote.bidPrice);if(validPrice(bid))markPrices[symbol]=bid;else failures.push(`${symbol}: missing exit bid mark`);}catch(e){failures.push(`${symbol}: ${e.message}`);}}
-  next.meta={...next.meta,lastRun:new Date(now).toISOString(),lastSuccess:new Date(now).toISOString(),lastError:null,lastBatch:symbols,lastShard:shard,lastScanCount:checked,missing:failures.slice(0,30),modelStatus:mlStatus,lastMarketPriceAt:new Date(now).toISOString(),markPrices};
+  for(const symbol of openSymbols){try{const quote=await market.get(`ticker/bookTicker?symbol=${symbol}`);const bid=Number(quote.bidPrice);if(validPrice(bid))markPrices[symbol]=bid;else failures.push(`${symbol}: missing exit bid mark`);}catch(e){failures.push(`${symbol}: ${e.message}`);}}
+  next.meta={...next.meta,lastRun:new Date(now).toISOString(),lastSuccess:new Date(now).toISOString(),lastError:null,lastBatch:symbols,lastShard:shard,lastScanCount:checked,missing:failures.slice(0,30),modelStatus:mlStatus,lastMarketPriceAt:new Date(now).toISOString(),marketDataHost:market.lastHost,markPrices};
   return next;
 }
 export function summary(state){
@@ -137,6 +187,10 @@ export default {
     const u=new URL(request.url);
     const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'https://kuke2013-hub.github.io','Vary':'Origin'};
     if(request.method!=='GET')return new Response(JSON.stringify({error:'Read-only API. No external trade or trigger endpoint.'}),{status:405,headers});
+    if(u.pathname==='/api/binance-diagnostics'){
+      const diagnostics=await binanceDiagnostics();
+      return new Response(JSON.stringify(diagnostics),{status:200,headers:{...headers,'Cache-Control':'public, max-age=120'}});
+    }
     if(u.pathname==='/api/status'){
       try{const {state}=await readDB(env);return new Response(JSON.stringify(summary(state)),{status:200,headers});}
       catch(e){return new Response(JSON.stringify({ready:false,error:String(e.message)}),{status:503,headers});}

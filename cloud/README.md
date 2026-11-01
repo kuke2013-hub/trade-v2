@@ -7,7 +7,7 @@ This Worker is an **independent, server-side, paper-only** experiment. It has no
 ## Cloudflare setup (one-time, Free-plan pilot)
 
 1. In [Cloudflare D1](https://dash.cloudflare.com/?to=/:account/workers/d1), select **Create database**. Name it exactly `trade-v2-paper`. Copy its UUID **Database ID**. The UUID is not a password.
-2. **Completed:** `cloud/wrangler.jsonc` now contains the user's D1 database ID, with the binding name `DB` and database name `trade-v2-paper`. There is no need to edit the file in GitHub. **Never share Cloudflare API tokens or passwords.**
+2. In GitHub `kuke2013-hub/trade-v2`, open `cloud/wrangler.jsonc`, click Edit, and replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` with the UUID. Commit this one-line change. Alternatively share only the database UUID with the assistant so it can update the config through GitHub. **Never share your Cloudflare API tokens or passwords.**
 3. In [Cloudflare Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages), choose **Create application → GitHub**, and import `kuke2013-hub/trade-v2`. Set the **root directory to `cloud`**, and **Worker name to `trade-v2-monitor`** (the name must match `wrangler.jsonc`). Build/deploy command `npx wrangler deploy`; dependency install `npm install` if prompted. Cloudflare Workers Builds will then deploy the Worker from GitHub pushes.
 4. Confirm the scheduled Cron Trigger `*/3 * * * *` and the D1 binding `DB` exist in the deployed Worker. The Worker automatically creates the `cloud_state` table on the first scheduled or status request, so no SQL migration is required for this first release.
 5. Test `https://trade-v2-monitor.<your-workers-subdomain>.workers.dev/health` which should return `"dbBound":true`. After successful scheduled runs, `/api/status` will return a non-null `meta.lastSuccess`. In the V2 GitHub Pages dashboard, enter the Worker base URL into **Cloudflare paper monitor → Worker HTTPS URL** and select **Connect & refresh**.
@@ -23,9 +23,18 @@ This Worker is an **independent, server-side, paper-only** experiment. It has no
 - Current free Workers limits include **10 ms CPU time** and **50 external subrequests** per invocation, so benchmark real Worker usage. The workload is intentionally small and **free operation is not guaranteed** if real usage or traffic exceeds Cloudflare limits.
 - This is for **noncommercial research**. Review Binance Vision historical-data terms before using historical-derived models commercially or placing live orders.
 
+## Binance market-data connectivity and 403 diagnosis
+
+If `/api/status` reports `lastSuccess: null` and an HTTP 403 from Binance, **no paper-trade signals have been processed**. The Worker fails closed: it does not manufacture prices or treat an unsuccessful tick as a successful scan. The status error now identifies attempted Binance Spot hosts and HTTP codes.
+
+The Worker checks only official Binance Spot market-data endpoints (`data-api.binance.vision`, `api.binance.com`, `api-gcp.binance.com`, `api1.binance.com`). It starts with the dedicated market-data-only host and falls back to Binance's documented general Spot hosts only when a request is denied or temporarily unavailable. HTTP 418/429 rate blocks and HTTP 451 location restrictions stop retrying. No other exchange or proxy is used.
+
+Inspect the read-only `/api/binance-diagnostics` endpoint to see whether each official host can return two authentic BTCUSDT hourly candles from Cloudflare. The endpoint **does not run a trading scan, submit an order or touch D1 state**. A successful diagnostic by itself does not establish a successful scheduled tick; inspect `/api/status` and a fresh `meta.lastSuccess` timestamp. If all hosts fail, the experimental server-side feed remains blocked; use an explicitly permitted alternative deployment environment rather than fabricating data.
+
 ## API
 
 - `GET /health`: Worker deployed, D1 binding present.
+- `GET /api/binance-diagnostics`: fixed-target official Binance Spot connectivity check (read-only, no state mutation).
 - `GET /api/status`: cloud simulation P&L, open positions, up to 100 closed trades, last successful scan, latest API errors, model gate status, and per-strategy totals.
 - All other paths return 404; non-GET methods return 405. The read-only API returns CORS headers for the user's GitHub Pages domain.
 

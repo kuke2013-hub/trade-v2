@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CLOUD_PAIRS, subset, tick, summary, scheduledRun} from '../cloud/worker.mjs';
+import {CLOUD_PAIRS, BINANCE_API_HOSTS, marketDataClient, binanceDiagnostics, subset, tick, summary, scheduledRun} from '../cloud/worker.mjs';
 import {createState} from '../engine.mjs';
 
 const H=3600000,MIN=60000;
@@ -86,4 +86,52 @@ test('read-only Worker endpoints do not permit creating positions',async()=>{
  const {default:worker}=await import('../cloud/worker.mjs');
  const resp=await worker.fetch(new Request('https://worker.test/api/status',{method:'POST'}),{DB:fakeDB()});
  assert.equal(resp.status,405);
+});
+
+
+test('official Binance fallback survives a 403 on data-api without switching exchange',async()=>{
+  const calls=[];
+  const fetcher=async input=>{
+    const u=new URL(input);calls.push(u.host);
+    if(u.host==='data-api.binance.vision')return {ok:false,status:403};
+    if(u.host==='api.binance.com')return {ok:true,status:200,json:async()=>[{close:'100'}]};
+    throw Error('Should not try third-party data');
+  };
+  const market=marketDataClient(fetcher);
+  assert.deepEqual(await market.get('klines?symbol=BTCUSDT&interval=1h&limit=1'),[{close:'100'}]);
+  assert.equal(market.lastHost,'api.binance.com');
+  await market.get('ticker/bookTicker?symbol=ETHUSDT');
+  assert.deepEqual(calls,['data-api.binance.vision','api.binance.com','api.binance.com']);
+});
+
+test('Binance 429 rate ban is never bypassed by switching hosts',async()=>{
+  const called=[];
+  const market=marketDataClient(async input=>{
+    called.push(new URL(input).host);
+    return {ok:false,status:429};
+  });
+  await assert.rejects(()=>market.get('klines?symbol=BTCUSDT'),/429/);
+  assert.deepEqual(called,['data-api.binance.vision']);
+});
+
+test('all unavailable Binance Spot endpoints are reported precisely without paper trades',async()=>{
+  const called=[];
+  const fail=async input=>{called.push(new URL(input).host);return {ok:false,status:403};};
+  const market=marketDataClient(fail);
+  await assert.rejects(()=>market.get('klines?symbol=BTCUSDT'),error=>
+    BINANCE_API_HOSTS.every(x=>error.message.includes(new URL(x).host+':403')));
+  assert.equal(called.length,BINANCE_API_HOSTS.length);
+  await assert.rejects(()=>tick(blank(),START,fail),/Cannot safely evaluate market signals/);
+});
+
+test('read-only diagnostic checks real kline shape per official endpoint',async()=>{
+  const diagnostic=await binanceDiagnostics(async input=>{
+    const host=new URL(input).host;
+    if(host==='data-api.binance.vision')return {ok:false,status:403};
+    return {ok:true,status:200,json:async()=>[klines('BTCUSDT')[0],klines('BTCUSDT')[1]]};
+  });
+  assert.equal(diagnostic.results.length,BINANCE_API_HOSTS.length);
+  assert.equal(diagnostic.results[0].httpStatus,403);
+  assert.equal(diagnostic.results[0].validBinanceKlines,false);
+  assert.equal(diagnostic.results[1].validBinanceKlines,true);
 });

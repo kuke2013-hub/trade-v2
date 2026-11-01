@@ -390,7 +390,7 @@ async function refreshCloud(){
     if(data.paperOnly!==true||data.liveOrders!==false||!data.performance||!data.meta)throw new Error('This endpoint is not a recognised read-only V2 cloud monitor.');
     const last=Date.parse(data.meta.lastSuccess??'');
     const stale=!Number.isFinite(last)||Date.now()-last>25*60000;
-    cloudStatus(stale?'No recent successful server scan. Check the Worker Cron Trigger and logs.':`Independent virtual account · ${data.universe} symbols in a ~${data.rotationMinutes}-minute rotation · ML: ${data.meta.modelStatus}. ${data.meta.missing?.length??0} latest data warnings.`,stale?'stale':'connected');
+    cloudStatus(stale?(data.meta.lastError?`Server scan failed: ${String(data.meta.lastError).slice(0,300)}`:'No recent successful server scan. Check the Worker Cron Trigger and logs.'):`Independent virtual account · ${data.universe} symbols in a ~${data.rotationMinutes}-minute rotation · Binance feed: ${data.meta.marketDataHost||'unknown'} · ML: ${data.meta.modelStatus}. ${data.meta.missing?.length??0} latest data warnings.`,stale?'stale':'connected');
     $('cloud-total').textContent=cloudNumeric(data.performance.estimatedNet);
     $('cloud-realised').textContent=cloudNumeric(data.performance.realised);
     $('cloud-open').textContent=Number.isInteger(data.performance.openCount)?String(data.performance.openCount):'—';
