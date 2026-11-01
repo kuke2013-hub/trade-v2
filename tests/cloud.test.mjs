@@ -154,3 +154,17 @@ test('read-only diagnostic checks real kline shape per official endpoint',async(
   assert.equal(diagnostic.results[0].validBinanceKlines,false);
   assert.equal(diagnostic.results[1].validBinanceKlines,true);
 });
+
+test('diagnostics can probe the precise 90-candle scheduled request without entering paper trades',async()=>{
+  const requested=[];
+  const diagnostics=await binanceDiagnostics(async input=>{
+    const u=new URL(input);
+    requested.push(u.searchParams.get('limit'));
+    if(u.hostname==='api-gcp.binance.com')return {ok:true,status:200,json:async()=>klines('BTCUSDT')};
+    return {ok:false,status:451};
+  },90);
+  assert.equal(diagnostics.requestLimit,90);
+  assert.deepEqual(requested,Array(BINANCE_API_HOSTS.length).fill('90'));
+  assert.equal(diagnostics.results.find(r=>r.host==='api-gcp.binance.com').validBinanceKlines,true);
+  assert.equal(diagnostics.results.filter(r=>r.validBinanceKlines).length,1);
+});

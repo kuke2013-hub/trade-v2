@@ -59,18 +59,19 @@ export function marketDataClient(fetcher=fetch, hosts=BINANCE_API_HOSTS){
 }
 
 /** Read-only, fixed-target connectivity check; never enters trades. */
-export async function binanceDiagnostics(fetcher=fetch){
+export async function binanceDiagnostics(fetcher=fetch,limit=2){
+  if(limit!==2&&limit!==90)throw new Error('Only fixed 2- or 90-candle diagnostics are supported');
   const results=[];
   for(const base of BINANCE_API_HOSTS){
     const host=new URL(base).host;
     try{
-      const response=await fetcher(`${base}/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=2`,{headers:{Accept:'application/json'}});
+      const response=await fetcher(`${base}/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=${limit}`,{headers:{Accept:'application/json'}});
       let valid=false;
-      if(response.ok){try{const body=await response.json();valid=Array.isArray(body)&&body.length===2&&body.every(v=>Array.isArray(v)&&v.length>=7);}catch{valid=false;}}
+      if(response.ok){try{const body=await response.json();valid=Array.isArray(body)&&body.length===limit&&body.every(v=>Array.isArray(v)&&v.length>=7);}catch{valid=false;}}
       results.push({host,httpStatus:response.status,validBinanceKlines:valid});
     }catch{results.push({host,httpStatus:null,validBinanceKlines:false,error:'network request failed'});}
   }
-  return {source:'Official Binance Spot market data',checkedAt:new Date().toISOString(),results};
+  return {source:'Official Binance Spot market data',checkedAt:new Date().toISOString(),requestLimit:limit,results};
 }
 async function externalModel(fetcher){try{
   const response=await fetcher(MODEL_URL,{headers:{Accept:'application/json'}});
@@ -191,7 +192,7 @@ export default {
     const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'https://kuke2013-hub.github.io','Vary':'Origin'};
     if(request.method!=='GET')return new Response(JSON.stringify({error:'Read-only API. No external trade or trigger endpoint.'}),{status:405,headers});
     if(u.pathname==='/api/binance-diagnostics'){
-      const diagnostics=await binanceDiagnostics();
+      const diagnostics=await binanceDiagnostics(fetch,u.searchParams.get('limit')==='90'?90:2);
       return new Response(JSON.stringify(diagnostics),{status:200,headers:{...headers,'Cache-Control':'public, max-age=120'}});
     }
     if(u.pathname==='/api/status'){
