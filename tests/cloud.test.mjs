@@ -89,19 +89,38 @@ test('read-only Worker endpoints do not permit creating positions',async()=>{
 });
 
 
-test('official Binance fallback survives a 403 on data-api without switching exchange',async()=>{
+test('official Binance fallback survives a 403 on GCP and reuses the healthy host',async()=>{
   const calls=[];
   const fetcher=async input=>{
     const u=new URL(input);calls.push(u.host);
-    if(u.host==='data-api.binance.vision')return {ok:false,status:403};
-    if(u.host==='api.binance.com')return {ok:true,status:200,json:async()=>[{close:'100'}]};
-    throw Error('Should not try third-party data');
+    if(u.host==='api-gcp.binance.com')return {ok:false,status:403};
+    if(u.host==='data-api.binance.vision')return {ok:true,status:200,json:async()=>[{close:'100'}]};
+    throw Error('Should not try a denied third host');
   };
   const market=marketDataClient(fetcher);
   assert.deepEqual(await market.get('klines?symbol=BTCUSDT&interval=1h&limit=1'),[{close:'100'}]);
-  assert.equal(market.lastHost,'api.binance.com');
+  assert.equal(market.lastHost,'data-api.binance.vision');
   await market.get('ticker/bookTicker?symbol=ETHUSDT');
-  assert.deepEqual(calls,['data-api.binance.vision','api.binance.com','api.binance.com']);
+  assert.deepEqual(calls,['api-gcp.binance.com','data-api.binance.vision','data-api.binance.vision']);
+});
+
+test('Cloudflare diagnostic healthy GCP endpoint is chosen before an unrelated host 451',async()=>{
+  const calls=[];
+  const market=marketDataClient(async input=>{
+    const host=new URL(input).host;calls.push(host);
+    if(host==='api-gcp.binance.com')return {ok:true,status:200,json:async()=>[{close:'101'}]};
+    throw Error('No second endpoint should be consulted');
+  });
+  assert.deepEqual(await market.get('klines?symbol=BTCUSDT'),[{close:'101'}]);
+  assert.equal(market.lastHost,'api-gcp.binance.com');
+  assert.deepEqual(calls,['api-gcp.binance.com']);
+});
+
+test('HTTP 451 on preferred host fails closed without checking alternative endpoints',async()=>{
+  const calls=[];
+  const market=marketDataClient(async input=>{calls.push(new URL(input).host);return {ok:false,status:451};});
+  await assert.rejects(()=>market.get('klines?symbol=BTCUSDT'),/api-gcp.binance.com:451/);
+  assert.deepEqual(calls,['api-gcp.binance.com']);
 });
 
 test('Binance 429 rate ban is never bypassed by switching hosts',async()=>{
@@ -111,7 +130,7 @@ test('Binance 429 rate ban is never bypassed by switching hosts',async()=>{
     return {ok:false,status:429};
   });
   await assert.rejects(()=>market.get('klines?symbol=BTCUSDT'),/429/);
-  assert.deepEqual(called,['data-api.binance.vision']);
+  assert.deepEqual(called,['api-gcp.binance.com']);
 });
 
 test('all unavailable Binance Spot endpoints are reported precisely without paper trades',async()=>{
@@ -127,7 +146,7 @@ test('all unavailable Binance Spot endpoints are reported precisely without pape
 test('read-only diagnostic checks real kline shape per official endpoint',async()=>{
   const diagnostic=await binanceDiagnostics(async input=>{
     const host=new URL(input).host;
-    if(host==='data-api.binance.vision')return {ok:false,status:403};
+    if(host==='api-gcp.binance.com')return {ok:false,status:403};
     return {ok:true,status:200,json:async()=>[klines('BTCUSDT')[0],klines('BTCUSDT')[1]]};
   });
   assert.equal(diagnostic.results.length,BINANCE_API_HOSTS.length);

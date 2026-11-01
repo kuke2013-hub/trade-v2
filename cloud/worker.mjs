@@ -13,10 +13,13 @@ export const SHARDS = 5;
 const PERIOD = 180000; // 3-minute CRON; full coin universe scanned roughly every 15 minutes
 // Official Binance Spot endpoints only. No third-party prices, proxies or invented fills.
 // Every URL below is listed in Binance's public Spot REST documentation.
+// Cloudflare live diagnostics showed api-gcp.binance.com accepts public klines,
+// while data-api may return 403 and api.binance.com may return 451. Prefer the
+// working, officially documented host without requiring a denied retry chain.
 export const BINANCE_API_HOSTS = Object.freeze([
+  'https://api-gcp.binance.com',
   'https://data-api.binance.vision',
   'https://api.binance.com',
-  'https://api-gcp.binance.com',
   'https://api1.binance.com'
 ]);
 const RETRYABLE_HTTP = new Set([403, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
