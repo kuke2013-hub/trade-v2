@@ -10,8 +10,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   collect:
-    # Explicit pilot gate: scheduled job is skipped until the user enables the variable.
-    if: github.event_name == 'workflow_dispatch' || vars.TRADE_V2_COLLECTOR_ENABLED == 'true'
+    # Pilot enabled after successful authenticated manual collection. Set the repository variable
+    # TRADE_V2_COLLECTOR_ENABLED to 'false' to pause scheduled jobs; manual runs remain possible.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.TRADE_V2_COLLECTOR_ENABLED != 'false')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
